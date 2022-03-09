@@ -1,0 +1,879 @@
+[1mdiff --git a/alg/gdalgrid.cpp b/alg/gdalgrid.cpp[m
+[1mindex 042d31bec3..43dd6523f9 100644[m
+[1m--- a/alg/gdalgrid.cpp[m
+[1m+++ b/alg/gdalgrid.cpp[m
+[36m@@ -798,6 +798,9 @@[m [mGDALGridDataMetricMinimum( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfRadius2 = poOptions->dfRadius2 * poOptions->dfRadius2;[m
+     const double dfR12 = dfRadius1 * dfRadius2;[m
+ [m
+[32m+[m[32m    GDALGridExtraParameters* psExtraParams = static_cast<GDALGridExtraParameters *>(hExtraParamsIn);[m
+[32m+[m[32m    CPLQuadTree* phQuadTree = psExtraParams->hQuadTree;[m
+[32m+[m
+     // Compute coefficients for coordinate system rotation.[m
+     const double dfAngle = TO_RADIANS * poOptions->dfAngle;[m
+     const bool bRotated = dfAngle != 0.0;[m
+[36m@@ -805,40 +808,78 @@[m [mGDALGridDataMetricMinimum( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfCoeff2 = bRotated ? sin(dfAngle) : 0.0;[m
+ [m
+     double dfMinimumValue=0.0;[m
+[31m-    GUInt32 i = 0;[m
+     GUInt32 n = 0;[m
+[31m-[m
+[31m-    while( i < nPoints )[m
+[32m+[m[32m    double dfSearchRadius = psExtraParams->dfInitialSearchRadius;[m
+[32m+[m[32m    if( phQuadTree != nullptr && dfRadius1 == dfRadius2 && dfSearchRadius > 0 )[m
+     {[m
+[31m-        double dfRX = padfX[i] - dfXPoint;[m
+[31m-        double dfRY = padfY[i] - dfYPoint;[m
+[31m-[m
+[31m-        if( bRotated )[m
+[32m+[m[32m        CPLRectObj sAoi;[m
+[32m+[m[32m        sAoi.minx = dfXPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.miny = dfYPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxx = dfXPoint + dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxy = dfYPoint + dfSearchRadius;[m
+[32m+[m[32m        int nFeatureCount = 0;[m
+[32m+[m[32m        GDALGridPoint** papsPoints = reinterpret_cast<GDALGridPoint **>([m
+[32m+[m[32m                CPLQuadTreeSearch(phQuadTree, &sAoi, &nFeatureCount) );[m
+[32m+[m[32m        if( nFeatureCount != 0 )[m
+         {[m
+[31m-            const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[31m-            const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m[32m            for( int k = 0; k < nFeatureCount; k++ )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                const int i = papsPoints[k]->i;[m
+[32m+[m[32m                const double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m                const double dfRY = padfY[i] - dfYPoint;[m
+ [m
+[31m-            dfRX = dfRXRotated;[m
+[31m-            dfRY = dfRYRotated;[m
+[32m+[m[32m                if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    if(n){[m
+[32m+[m[32m                        if (dfMinimumValue>padfZ[i]){[m
+[32m+[m[32m                            dfMinimumValue=padfZ[i];[m
+[32m+[m[32m                        }[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                    else{[m
+[32m+[m[32m                        dfMinimumValue=padfZ[i];[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                    n++;[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+         }[m
+[31m-[m
+[31m-        // Is this point located inside the search ellipse?[m
+[31m-        if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m        CPLFree(papsPoints);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    else{[m
+[32m+[m[32m        GUInt32 i = 0;[m
+[32m+[m[32m        while( i < nPoints )[m
+         {[m
+[31m-            if( n > 0 )[m
+[32m+[m[32m            double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m            double dfRY = padfY[i] - dfYPoint;[m
+[32m+[m
+[32m+[m[32m            if( bRotated )[m
+             {[m
+[31m-                if( dfMinimumValue > padfZ[i] )[m
+[31m-                    dfMinimumValue = padfZ[i];[m
+[32m+[m[32m                const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[32m+[m[32m                const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m
+[32m+[m[32m                dfRX = dfRXRotated;[m
+[32m+[m[32m                dfRY = dfRYRotated;[m
+             }[m
+[31m-            else[m
+[32m+[m
+[32m+[m[32m            // Is this point located inside the search ellipse?[m
+[32m+[m[32m            if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+             {[m
+[31m-                dfMinimumValue = padfZ[i];[m
+[32m+[m[32m                if( n > 0 )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    if( dfMinimumValue > padfZ[i] )[m
+[32m+[m[32m                        dfMinimumValue = padfZ[i];[m
+[32m+[m[32m                }[m
+[32m+[m[32m                else[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    dfMinimumValue = padfZ[i];[m
+[32m+[m[32m                }[m
+[32m+[m[32m                n++;[m
+             }[m
+[31m-            n++;[m
+[32m+[m
+[32m+[m[32m            i++;[m
+         }[m
+ [m
+[31m-        i++;[m
+     }[m
+[32m+[m[41m    [m
+ [m
+     if( n < poOptions->nMinPoints || n == 0 )[m
+     {[m
+[36m@@ -906,6 +947,9 @@[m [mGDALGridDataMetricMaximum( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfRadius2 = poOptions->dfRadius2 * poOptions->dfRadius2;[m
+     const double dfR12 = dfRadius1 * dfRadius2;[m
+ [m
+[32m+[m[32m    GDALGridExtraParameters* psExtraParams = static_cast<GDALGridExtraParameters *>(hExtraParamsIn);[m
+[32m+[m[32m    CPLQuadTree* phQuadTree = psExtraParams->hQuadTree;[m
+[32m+[m
+     // Compute coefficients for coordinate system rotation.[m
+     const double dfAngle = TO_RADIANS * poOptions->dfAngle;[m
+     const bool bRotated = dfAngle != 0.0;[m
+[36m@@ -913,41 +957,80 @@[m [mGDALGridDataMetricMaximum( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfCoeff2 = bRotated ? sin(dfAngle) : 0.0;[m
+ [m
+     double dfMaximumValue=0.0;[m
+[31m-    GUInt32 i = 0;[m
+     GUInt32 n = 0;[m
+[31m-[m
+[31m-    while( i < nPoints )[m
+[32m+[m[32m    double dfSearchRadius = psExtraParams->dfInitialSearchRadius;[m
+[32m+[m[32m    if( phQuadTree != nullptr && dfRadius1 == dfRadius2 && dfSearchRadius > 0 )[m
+     {[m
+[31m-        double dfRX = padfX[i] - dfXPoint;[m
+[31m-        double dfRY = padfY[i] - dfYPoint;[m
+[31m-[m
+[31m-        if( bRotated )[m
+[32m+[m[32m        CPLRectObj sAoi;[m
+[32m+[m[32m        sAoi.minx = dfXPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.miny = dfYPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxx = dfXPoint + dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxy = dfYPoint + dfSearchRadius;[m
+[32m+[m[32m        int nFeatureCount = 0;[m
+[32m+[m[32m        GDALGridPoint** papsPoints = reinterpret_cast<GDALGridPoint **>([m
+[32m+[m[32m                CPLQuadTreeSearch(phQuadTree, &sAoi, &nFeatureCount) );[m
+[32m+[m[32m        if( nFeatureCount != 0 )[m
+         {[m
+[31m-            const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[31m-            const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m[32m            for( int k = 0; k < nFeatureCount; k++ )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                const int i = papsPoints[k]->i;[m
+[32m+[m[32m                const double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m                const double dfRY = padfY[i] - dfYPoint;[m
+ [m
+[31m-            dfRX = dfRXRotated;[m
+[31m-            dfRY = dfRYRotated;[m
+[32m+[m[32m                if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    if(n){[m
+[32m+[m[32m                        if (dfMaximumValue<padfZ[i]){[m
+[32m+[m[32m                            dfMaximumValue=padfZ[i];[m
+[32m+[m[32m                        }[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                    else{[m
+[32m+[m[32m                        dfMaximumValue=padfZ[i];[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                    n++;[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+         }[m
+[31m-[m
+[31m-        // Is this point located inside the search ellipse?[m
+[31m-        if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m        CPLFree(papsPoints);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    else{[m
+[32m+[m[32m        GUInt32 i = 0;[m
+[32m+[m[32m         while( i < nPoints )[m
+         {[m
+[31m-            if( n )[m
+[32m+[m[32m            double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m            double dfRY = padfY[i] - dfYPoint;[m
+[32m+[m
+[32m+[m[32m            if( bRotated )[m
+             {[m
+[31m-                if( dfMaximumValue < padfZ[i] )[m
+[31m-                    dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[32m+[m[32m                const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m
+[32m+[m[32m                dfRX = dfRXRotated;[m
+[32m+[m[32m                dfRY = dfRYRotated;[m
+             }[m
+[31m-            else[m
+[32m+[m
+[32m+[m[32m            // Is this point located inside the search ellipse?[m
+[32m+[m[32m            if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+             {[m
+[31m-                dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                if( n )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    if( dfMaximumValue < padfZ[i] )[m
+[32m+[m[32m                        dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                }[m
+[32m+[m[32m                else[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                }[m
+[32m+[m[32m                n++;[m
+             }[m
+[31m-            n++;[m
+[32m+[m
+[32m+[m[32m            i++;[m
+         }[m
+ [m
+[31m-        i++;[m
+     }[m
+ [m
+[32m+[m[41m   [m
+[32m+[m
+     if( n < poOptions->nMinPoints[m
+          || n == 0 )[m
+     {[m
+[36m@@ -1015,6 +1098,9 @@[m [mGDALGridDataMetricRange( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfRadius2 = poOptions->dfRadius2 * poOptions->dfRadius2;[m
+     const double dfR12 = dfRadius1 * dfRadius2;[m
+ [m
+[32m+[m[32m    GDALGridExtraParameters* psExtraParams = static_cast<GDALGridExtraParameters *>(hExtraParamsIn);[m
+[32m+[m[32m    CPLQuadTree* phQuadTree = psExtraParams->hQuadTree;[m
+[32m+[m
+     // Compute coefficients for coordinate system rotation.[m
+     const double dfAngle = TO_RADIANS * poOptions->dfAngle;[m
+     const bool bRotated = dfAngle != 0.0;[m
+[36m@@ -1023,44 +1109,87 @@[m [mGDALGridDataMetricRange( const void *poOptionsIn, GUInt32 nPoints,[m
+ [m
+     double dfMaximumValue = 0.0;[m
+     double dfMinimumValue = 0.0;[m
+[31m-    GUInt32 i = 0;[m
+     GUInt32 n = 0;[m
+[31m-[m
+[31m-    while( i < nPoints )[m
+[32m+[m[32m    double dfSearchRadius = psExtraParams->dfInitialSearchRadius;[m
+[32m+[m[32m    if( phQuadTree != nullptr && dfRadius1 == dfRadius2 && dfSearchRadius > 0 )[m
+     {[m
+[31m-        double dfRX = padfX[i] - dfXPoint;[m
+[31m-        double dfRY = padfY[i] - dfYPoint;[m
+[31m-[m
+[31m-        if( bRotated )[m
+[32m+[m[32m        CPLRectObj sAoi;[m
+[32m+[m[32m        sAoi.minx = dfXPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.miny = dfYPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxx = dfXPoint + dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxy = dfYPoint + dfSearchRadius;[m
+[32m+[m[32m        int nFeatureCount = 0;[m
+[32m+[m[32m        GDALGridPoint** papsPoints = reinterpret_cast<GDALGridPoint **>([m
+[32m+[m[32m                CPLQuadTreeSearch(phQuadTree, &sAoi, &nFeatureCount) );[m
+[32m+[m[32m        if( nFeatureCount != 0 )[m
+         {[m
+[31m-            const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[31m-            const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m[32m            for( int k = 0; k < nFeatureCount; k++ )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                const int i = papsPoints[k]->i;[m
+[32m+[m[32m                const double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m                const double dfRY = padfY[i] - dfYPoint;[m
+ [m
+[31m-            dfRX = dfRXRotated;[m
+[31m-            dfRY = dfRYRotated;[m
+[32m+[m[32m                if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    if( n > 0 )[m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        if( dfMinimumValue > padfZ[i] )[m
+[32m+[m[32m                            dfMinimumValue = padfZ[i];[m
+[32m+[m[32m                        if( dfMaximumValue < padfZ[i] )[m
+[32m+[m[32m                            dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                    else[m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        dfMinimumValue = padfZ[i];[m
+[32m+[m[32m                        dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                    n++;[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+         }[m
+[31m-[m
+[31m-        // Is this point located inside the search ellipse?[m
+[31m-        if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m        CPLFree(papsPoints);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    else{[m
+[32m+[m[32m        GUInt32 i = 0;[m
+[32m+[m[32m        while( i < nPoints )[m
+         {[m
+[31m-            if( n > 0 )[m
+[32m+[m[32m            double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m            double dfRY = padfY[i] - dfYPoint;[m
+[32m+[m
+[32m+[m[32m            if( bRotated )[m
+             {[m
+[31m-                if( dfMinimumValue > padfZ[i] )[m
+[31m-                    dfMinimumValue = padfZ[i];[m
+[31m-                if( dfMaximumValue < padfZ[i] )[m
+[31m-                    dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[32m+[m[32m                const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m
+[32m+[m[32m                dfRX = dfRXRotated;[m
+[32m+[m[32m                dfRY = dfRYRotated;[m
+             }[m
+[31m-            else[m
+[32m+[m
+[32m+[m[32m            // Is this point located inside the search ellipse?[m
+[32m+[m[32m            if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+             {[m
+[31m-                dfMinimumValue = padfZ[i];[m
+[31m-                dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                if( n > 0 )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    if( dfMinimumValue > padfZ[i] )[m
+[32m+[m[32m                        dfMinimumValue = padfZ[i];[m
+[32m+[m[32m                    if( dfMaximumValue < padfZ[i] )[m
+[32m+[m[32m                        dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                }[m
+[32m+[m[32m                else[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    dfMinimumValue = padfZ[i];[m
+[32m+[m[32m                    dfMaximumValue = padfZ[i];[m
+[32m+[m[32m                }[m
+[32m+[m[32m                n++;[m
+             }[m
+[31m-            n++;[m
+[32m+[m
+[32m+[m[32m            i++;[m
+         }[m
+ [m
+[31m-        i++;[m
+     }[m
+ [m
+[32m+[m[41m    [m
+[32m+[m
+     if( n < poOptions->nMinPoints || n == 0 )[m
+     {[m
+         *pdfValue = poOptions->dfNoDataValue;[m
+[36m@@ -1125,38 +1254,72 @@[m [mGDALGridDataMetricCount( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfRadius2 = poOptions->dfRadius2 * poOptions->dfRadius2;[m
+     const double dfR12 = dfRadius1 * dfRadius2;[m
+ [m
+[32m+[m[32m    GDALGridExtraParameters* psExtraParams = static_cast<GDALGridExtraParameters *>(hExtraParamsIn);[m
+[32m+[m[32m    CPLQuadTree* phQuadTree = psExtraParams->hQuadTree;[m
+[32m+[m
+     // Compute coefficients for coordinate system rotation.[m
+     const double    dfAngle = TO_RADIANS * poOptions->dfAngle;[m
+     const bool bRotated = dfAngle != 0.0;[m
+     const double dfCoeff1 = bRotated ? cos(dfAngle) : 0.0;[m
+     const double dfCoeff2 = bRotated ? sin(dfAngle) : 0.0;[m
+ [m
+[31m-    GUInt32 i = 0;[m
+     GUInt32 n = 0;[m
+[31m-[m
+[31m-    while( i < nPoints )[m
+[32m+[m[32m    double dfSearchRadius = psExtraParams->dfInitialSearchRadius;[m
+[32m+[m[32m    if( phQuadTree != nullptr && dfRadius1 == dfRadius2 && dfSearchRadius > 0 )[m
+     {[m
+[31m-        double dfRX = padfX[i] - dfXPoint;[m
+[31m-        double dfRY = padfY[i] - dfYPoint;[m
+[31m-[m
+[31m-        if( bRotated )[m
+[32m+[m[32m        CPLRectObj sAoi;[m
+[32m+[m[32m        sAoi.minx = dfXPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.miny = dfYPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxx = dfXPoint + dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxy = dfYPoint + dfSearchRadius;[m
+[32m+[m[32m        int nFeatureCount = 0;[m
+[32m+[m[32m        GDALGridPoint** papsPoints = reinterpret_cast<GDALGridPoint **>([m
+[32m+[m[32m                CPLQuadTreeSearch(phQuadTree, &sAoi, &nFeatureCount) );[m
+[32m+[m[32m        if( nFeatureCount != 0 )[m
+         {[m
+[31m-            const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[31m-            const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m[32m            for( int k = 0; k < nFeatureCount; k++ )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                const int i = papsPoints[k]->i;[m
+[32m+[m[32m                const double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m                const double dfRY = padfY[i] - dfYPoint;[m
+ [m
+[31m-            dfRX = dfRXRotated;[m
+[31m-            dfRY = dfRYRotated;[m
+[32m+[m[32m                if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    n++;[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+         }[m
+[31m-[m
+[31m-        // Is this point located inside the search ellipse?[m
+[31m-        if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m        CPLFree(papsPoints);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    else{[m
+[32m+[m[32m        GUInt32 i = 0;[m
+[32m+[m[32m        while( i < nPoints )[m
+         {[m
+[31m-            n++;[m
+[32m+[m[32m            double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m            double dfRY = padfY[i] - dfYPoint;[m
+[32m+[m
+[32m+[m[32m            if( bRotated )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[32m+[m[32m                const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m
+[32m+[m[32m                dfRX = dfRXRotated;[m
+[32m+[m[32m                dfRY = dfRYRotated;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            // Is this point located inside the search ellipse?[m
+[32m+[m[32m            if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                n++;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            i++;[m
+         }[m
+ [m
+[31m-        i++;[m
+     }[m
+ [m
+[32m+[m[41m   [m
+[32m+[m
+     if( n < poOptions->nMinPoints )[m
+     {[m
+         *pdfValue = poOptions->dfNoDataValue;[m
+[36m@@ -1226,6 +1389,9 @@[m [mGDALGridDataMetricAverageDistance( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfRadius2 = poOptions->dfRadius2 * poOptions->dfRadius2;[m
+     const double dfR12 = dfRadius1 * dfRadius2;[m
+ [m
+[32m+[m[32m    GDALGridExtraParameters* psExtraParams = static_cast<GDALGridExtraParameters *>(hExtraParamsIn);[m
+[32m+[m[32m    CPLQuadTree* phQuadTree = psExtraParams->hQuadTree;[m
+[32m+[m
+     // Compute coefficients for coordinate system rotation.[m
+     const double dfAngle = TO_RADIANS * poOptions->dfAngle;[m
+     const bool bRotated = dfAngle != 0.0;[m
+[36m@@ -1233,33 +1399,65 @@[m [mGDALGridDataMetricAverageDistance( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfCoeff2 = bRotated ? sin(dfAngle) : 0.0;[m
+ [m
+     double dfAccumulator = 0.0;[m
+[31m-    GUInt32 i = 0;[m
+     GUInt32 n = 0;[m
+[31m-[m
+[31m-    while( i < nPoints )[m
+[32m+[m[32m    double dfSearchRadius = psExtraParams->dfInitialSearchRadius;[m
+[32m+[m[32m    if( phQuadTree != nullptr && dfRadius1 == dfRadius2 && dfSearchRadius > 0 )[m
+     {[m
+[31m-        double dfRX = padfX[i] - dfXPoint;[m
+[31m-        double dfRY = padfY[i] - dfYPoint;[m
+[31m-[m
+[31m-        if( bRotated )[m
+[32m+[m[32m        CPLRectObj sAoi;[m
+[32m+[m[32m        sAoi.minx = dfXPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.miny = dfYPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxx = dfXPoint + dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxy = dfYPoint + dfSearchRadius;[m
+[32m+[m[32m        int nFeatureCount = 0;[m
+[32m+[m[32m        GDALGridPoint** papsPoints = reinterpret_cast<GDALGridPoint **>([m
+[32m+[m[32m                CPLQuadTreeSearch(phQuadTree, &sAoi, &nFeatureCount) );[m
+[32m+[m[32m        if( nFeatureCount != 0 )[m
+         {[m
+[31m-            const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[31m-            const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m[32m            for( int k = 0; k < nFeatureCount; k++ )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                const int i = papsPoints[k]->i;[m
+[32m+[m[32m                const double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m                const double dfRY = padfY[i] - dfYPoint;[m
+ [m
+[31m-            dfRX = dfRXRotated;[m
+[31m-            dfRY = dfRYRotated;[m
+[32m+[m[32m                if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    dfAccumulator += sqrt( dfRX * dfRX + dfRY * dfRY );[m
+[32m+[m[32m                    n++;[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+         }[m
+[32m+[m[32m        CPLFree(papsPoints);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    else{[m
+[32m+[m[32m        GUInt32 i = 0;[m
+ [m
+[31m-        // Is this point located inside the search ellipse?[m
+[31m-        if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m        while( i < nPoints )[m
+         {[m
+[31m-            dfAccumulator += sqrt( dfRX * dfRX + dfRY * dfRY );[m
+[31m-            n++;[m
+[31m-        }[m
+[32m+[m[32m            double dfRX = padfX[i] - dfXPoint;[m
+[32m+[m[32m            double dfRY = padfY[i] - dfYPoint;[m
+[32m+[m
+[32m+[m[32m            if( bRotated )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                const double dfRXRotated = dfRX * dfCoeff1 + dfRY * dfCoeff2;[m
+[32m+[m[32m                const double dfRYRotated = dfRY * dfCoeff1 - dfRX * dfCoeff2;[m
+[32m+[m
+[32m+[m[32m                dfRX = dfRXRotated;[m
+[32m+[m[32m                dfRY = dfRYRotated;[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            // Is this point located inside the search ellipse?[m
+[32m+[m[32m            if( dfRadius2 * dfRX * dfRX + dfRadius1 * dfRY * dfRY <= dfR12 )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                dfAccumulator += sqrt( dfRX * dfRX + dfRY * dfRY );[m
+[32m+[m[32m                n++;[m
+[32m+[m[32m            }[m
+ [m
+[31m-        i++;[m
+[32m+[m[32m            i++;[m
+[32m+[m[32m        }[m
+     }[m
+ [m
+[32m+[m[41m    [m
+[32m+[m
+     if( n < poOptions->nMinPoints || n == 0 )[m
+     {[m
+         *pdfValue = poOptions->dfNoDataValue;[m
+[36m@@ -1330,6 +1528,9 @@[m [mGDALGridDataMetricAverageDistancePts( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfRadius2 = poOptions->dfRadius2 * poOptions->dfRadius2;[m
+     const double dfR12 = dfRadius1 * dfRadius2;[m
+ [m
+[32m+[m[32m    GDALGridExtraParameters* psExtraParams = static_cast<GDALGridExtraParameters *>(hExtraParamsIn);[m
+[32m+[m[32m    CPLQuadTree* phQuadTree = psExtraParams->hQuadTree;[m
+[32m+[m
+     // Compute coefficients for coordinate system rotation.[m
+     const double dfAngle = TO_RADIANS * poOptions->dfAngle;[m
+     const bool bRotated = dfAngle != 0.0;[m
+[36m@@ -1337,60 +1538,107 @@[m [mGDALGridDataMetricAverageDistancePts( const void *poOptionsIn, GUInt32 nPoints,[m
+     const double dfCoeff2 = bRotated ? sin(dfAngle) : 0.0;[m
+ [m
+     double dfAccumulator = 0.0;[m
+[31m-    GUInt32 i = 0;[m
+     GUInt32 n = 0;[m
+[31m-[m
+[31m-    // Search for the first point within the search ellipse.[m
+[31m-    while( i < nPoints - 1 )[m
+[32m+[m[32m    double dfSearchRadius = psExtraParams->dfInitialSearchRadius;[m
+[32m+[m[32m    if( phQuadTree != nullptr && dfRadius1 == dfRadius2 && dfSearchRadius > 0 )[m
+     {[m
+[31m-        double dfRX1 = padfX[i] - dfXPoint;[m
+[31m-        double dfRY1 = padfY[i] - dfYPoint;[m
+[31m-[m
+[31m-        if( bRotated )[m
+[32m+[m[32m        CPLRectObj sAoi;[m
+[32m+[m[32m        sAoi.minx = dfXPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.miny = dfYPoint - dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxx = dfXPoint + dfSearchRadius;[m
+[32m+[m[32m        sAoi.maxy = dfYPoint + dfSearchRadius;[m
+[32m+[m[32m        int nFeatureCount = 0;[m
+[32m+[m[32m        GDALGridPoint** papsPoints = reinterpret_cast<GDALGridPoint **>([m
+[32m+[m[32m                CPLQuadTreeSearch(phQuadTree, &sAoi, &nFeatureCount) );[m
+[32m+[m[32m        if( nFeatureCount != 0 )[m
+         {[m
+[31m-            const double dfRXRotated = dfRX1 * dfCoeff1 + dfRY1 * dfCoeff2;[m
+[31m-            const double dfRYRotated = dfRY1 * dfCoeff1 - dfRX1 * dfCoeff2;[m
+[32m+[m[32m            for( int k = 0; k < nFeatureCount-1; k++ )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                const int i = papsPoints[k]->i;[m
+[32m+[m[32m                const double dfRX1 = padfX[i] - dfXPoint;[m
+[32m+[m[32m                const double dfRY1 = padfY[i] - dfYPoint;[m
+ [m
+[31m-            dfRX1 = dfRXRotated;[m
+[31m-            dfRY1 = dfRYRotated;[m
+[31m-        }[m
+[32m+[m[32m                if( dfRadius2 * dfRX1 * dfRX1 + dfRadius1 * dfRY1 * dfRY1 <= dfR12 )[m
+[32m+[m[32m                {[m
+[32m+[m[32m                    for( int j = k; j < nFeatureCount; j++ )[m
+[32m+[m[32m                    // Search all the remaining points within the ellipse and compute[m
+[32m+[m[32m                    // distances between them and the first point.[m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        const int ji = papsPoints[j]->i;[m
+[32m+[m[32m                        double dfRX2 = padfX[ji] - dfXPoint;[m
+[32m+[m[32m                        double dfRY2 = padfY[ji] - dfYPoint;[m
+ [m
+[31m-        // Is this point located inside the search ellipse?[m
+[31m-        if( dfRadius2 * dfRX1 * dfRX1 + dfRadius1 * dfRY1 * dfRY1 <= dfR12 )[m
+[32m+[m[32m                        if( dfRadius2 * dfRX2 * dfRX2 + dfRadius1 * dfRY2 * dfRY2 <= dfR12 )[m
+[32m+[m[32m                        {[m
+[32m+[m[32m                            const double dfRX = padfX[ji] - padfX[i];[m
+[32m+[m[32m                            const double dfRY = padfY[ji] - padfY[i];[m
+[32m+[m
+[32m+[m[32m                            dfAccumulator += sqrt( dfRX * dfRX + dfRY * dfRY );[m
+[32m+[m[32m                            n++;[m
+[32m+[m[32m                        }[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m[32m        CPLFree(papsPoints);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    else{[m
+[32m+[m[32m        GUInt32 i = 0;[m
+[32m+[m[32m        while( i < nPoints - 1 )[m
+         {[m
+[31m-            // Search all the remaining points within the ellipse and compute[m
+[31m-            // distances between them and the first point.[m
+[31m-            for( GUInt32 j = i + 1; j < nPoints; j++ )[m
+[32m+[m[32m            double dfRX1 = padfX[i] - dfXPoint;[m
+[32m+[m[32m            double dfRY1 = padfY[i] - dfYPoint;[m
+[32m+[m
+[32m+[m[32m            if( bRotated )[m
+             {[m
+[31m-                double dfRX2 = padfX[j] - dfXPoint;[m
+[31m-                double dfRY2 = padfY[j] - dfYPoint;[m
+[32m+[m[32m                const double dfRXRotated = dfRX1 * dfCoeff1 + dfRY1 * dfCoeff2;[m
+[32m+[m[32m                const double dfRYRotated = dfRY1 * dfCoeff1 - dfRX1 * dfCoeff2;[m
+[32m+[m
+[32m+[m[32m                dfRX1 = dfRXRotated;[m
+[32m+[m[32m                dfRY1 = dfRYRotated;[m
+[32m+[m[32m            }[m
+ [m
+[31m-                if( bRotated )[m
+[32m+[m[32m            // Is this point located inside the search ellipse?[m
+[32m+[m[32m            if( dfRadius2 * dfRX1 * dfRX1 + dfRadius1 * dfRY1 * dfRY1 <= dfR12 )[m
+[32m+[m[32m            {[m
+[32m+[m[32m                // Search all the remaining points within the ellipse and compute[m
+[32m+[m[32m                // distances between them and the first point.[m
+[32m+[m[32m                for( GUInt32 j = i + 1; j < nPoints; j++ )[m
+                 {[m
+[31m-                    const double dfRXRotated =[m
+[31m-                        dfRX2 * dfCoeff1 + dfRY2 * dfCoeff2;[m
+[31m-                    const double dfRYRotated =[m
+[31m-                        dfRY2 * dfCoeff1 - dfRX2 * dfCoeff2;[m
+[32m+[m[32m                    double dfRX2 = padfX[j] - dfXPoint;[m
+[32m+[m[32m                    double dfRY2 = padfY[j] - dfYPoint;[m
+ [m
+[31m-                    dfRX2 = dfRXRotated;[m
+[31m-                    dfRY2 = dfRYRotated;[m
+[31m-                }[m
+[32m+[m[32m                    if( bRotated )[m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        const double dfRXRotated =[m
+[32m+[m[32m                            dfRX2 * dfCoeff1 + dfRY2 * dfCoeff2;[m
+[32m+[m[32m                        const double dfRYRotated =[m
+[32m+[m[32m                            dfRY2 * dfCoeff1 - dfRX2 * dfCoeff2;[m
+ [m
+[31m-                if( dfRadius2 * dfRX2 * dfRX2 + dfRadius1 * dfRY2 * dfRY2[m
+[31m-                    <= dfR12 )[m
+[31m-                {[m
+[31m-                    const double dfRX = padfX[j] - padfX[i];[m
+[31m-                    const double dfRY = padfY[j] - padfY[i];[m
+[32m+[m[32m                        dfRX2 = dfRXRotated;[m
+[32m+[m[32m                        dfRY2 = dfRYRotated;[m
+[32m+[m[32m                    }[m
+ [m
+[31m-                    dfAccumulator += sqrt( dfRX * dfRX + dfRY * dfRY );[m
+[31m-                    n++;[m
+[32m+[m[32m                    if( dfRadius2 * dfRX2 * dfRX2 + dfRadius1 * dfRY2 * dfRY2[m
+[32m+[m[32m                        <= dfR12 )[m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        const double dfRX = padfX[j] - padfX[i];[m
+[32m+[m[32m                        const double dfRY = padfY[j] - padfY[i];[m
+[32m+[m
+[32m+[m[32m                        dfAccumulator += sqrt( dfRX * dfRX + dfRY * dfRY );[m
+[32m+[m[32m                        n++;[m
+[32m+[m[32m                    }[m
+                 }[m
+             }[m
+[32m+[m
+[32m+[m[32m            i++;[m
+         }[m
+ [m
+[31m-        i++;[m
+[32m+[m
+     }[m
+ [m
+[32m+[m[32m    // Search for the first point within the search ellipse.[m
+[32m+[m[41m    [m
+     if( n < poOptions->nMinPoints || n == 0 )[m
+     {[m
+         *pdfValue = poOptions->dfNoDataValue;[m
+[36m@@ -1890,7 +2138,8 @@[m [mGDALGridContextCreate( GDALGridAlgorithm eAlgorithm, const void *poOptions,[m
+                    sizeof(GDALGridNearestNeighborOptions));[m
+ [m
+             pfnGDALGridMethod = GDALGridNearestNeighbor;[m
+[31m-            bCreateQuadTree = (nPoints > 100 &&[m
+[32m+[m[32m            bCreateQuadTree = (nPoints > 100 &&[m[41m [m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfAngle == 0 &&[m
+                 static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius1 ==[m
+                 static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius2);[m
+             break;[m
+[36m@@ -1901,6 +2150,9 @@[m [mGDALGridContextCreate( GDALGridAlgorithm eAlgorithm, const void *poOptions,[m
+             memcpy(poOptionsNew, poOptions, sizeof(GDALGridDataMetricsOptions));[m
+ [m
+             pfnGDALGridMethod = GDALGridDataMetricMinimum;[m
+[32m+[m[32m            bCreateQuadTree = (nPoints > 100 &&[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius1 ==[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius2);[m
+             break;[m
+         }[m
+         case GGA_MetricMaximum:[m
+[36m@@ -1909,6 +2161,9 @@[m [mGDALGridContextCreate( GDALGridAlgorithm eAlgorithm, const void *poOptions,[m
+             memcpy(poOptionsNew, poOptions, sizeof(GDALGridDataMetricsOptions));[m
+ [m
+             pfnGDALGridMethod = GDALGridDataMetricMaximum;[m
+[32m+[m[32m            bCreateQuadTree = (nPoints > 100 &&[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius1 ==[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius2);[m
+             break;[m
+         }[m
+         case GGA_MetricRange:[m
+[36m@@ -1917,6 +2172,9 @@[m [mGDALGridContextCreate( GDALGridAlgorithm eAlgorithm, const void *poOptions,[m
+             memcpy(poOptionsNew, poOptions, sizeof(GDALGridDataMetricsOptions));[m
+ [m
+             pfnGDALGridMethod = GDALGridDataMetricRange;[m
+[32m+[m[32m            bCreateQuadTree = (nPoints > 100 &&[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius1 ==[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius2);[m
+             break;[m
+         }[m
+         case GGA_MetricCount:[m
+[36m@@ -1925,6 +2183,9 @@[m [mGDALGridContextCreate( GDALGridAlgorithm eAlgorithm, const void *poOptions,[m
+             memcpy(poOptionsNew, poOptions, sizeof(GDALGridDataMetricsOptions));[m
+ [m
+             pfnGDALGridMethod = GDALGridDataMetricCount;[m
+[32m+[m[32m            bCreateQuadTree = (nPoints > 100 &&[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius1 ==[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius2);[m
+             break;[m
+         }[m
+         case GGA_MetricAverageDistance:[m
+[36m@@ -1933,6 +2194,9 @@[m [mGDALGridContextCreate( GDALGridAlgorithm eAlgorithm, const void *poOptions,[m
+             memcpy(poOptionsNew, poOptions, sizeof(GDALGridDataMetricsOptions));[m
+ [m
+             pfnGDALGridMethod = GDALGridDataMetricAverageDistance;[m
+[32m+[m[32m            bCreateQuadTree = (nPoints > 100 &&[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius1 ==[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius2);[m
+             break;[m
+         }[m
+         case GGA_MetricAverageDistancePts:[m
+[36m@@ -1941,6 +2205,9 @@[m [mGDALGridContextCreate( GDALGridAlgorithm eAlgorithm, const void *poOptions,[m
+             memcpy(poOptionsNew, poOptions, sizeof(GDALGridDataMetricsOptions));[m
+ [m
+             pfnGDALGridMethod = GDALGridDataMetricAverageDistancePts;[m
+[32m+[m[32m            bCreateQuadTree = (nPoints > 100 &&[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius1 ==[m
+[32m+[m[32m                static_cast<const GDALGridNearestNeighborOptions *>(poOptions)->dfRadius2);[m
+             break;[m
+         }[m
+         case GGA_Linear:[m
+[1mdiff --git a/frmts/ecw/ecwcreatecopy.cpp b/frmts/ecw/ecwcreatecopy.cpp[m
+[1mindex e7fdee5f2f..99e1616862 100644[m
+[1m--- a/frmts/ecw/ecwcreatecopy.cpp[m
+[1m+++ b/frmts/ecw/ecwcreatecopy.cpp[m
+[36m@@ -124,7 +124,9 @@[m [mpublic:[m
+     void             *pProgressData;[m
+ [m
+     GDALDataType eWorkDT;[m
+[31m-[m
+[32m+[m[32m    int          m_nSwathLines;[m
+[32m+[m[32m    UINT32       m_nSwathOffset;[m
+[32m+[m[32m    GByte       *m_pabySwathBuf;[m
+     JP2UserBox** papoJP2UserBox;[m
+     int          nJP2UserBox;[m
+ [m
+[36m@@ -143,7 +145,11 @@[m [mprivate:[m
+ /************************************************************************/[m
+ [m
+ GDALECWCompressor::GDALECWCompressor() :[m
+[31m-    m_OStream(std::make_shared<VSIIOStream>()), eWorkDT(GDT_Unknown)[m
+[32m+[m[32m    m_OStream(std::make_shared<VSIIOStream>()),[m
+[32m+[m[32m    eWorkDT(GDT_Unknown),[m
+[32m+[m[32m    m_nSwathLines(0),[m
+[32m+[m[32m    m_nSwathOffset(0),[m
+[32m+[m[32m    m_pabySwathBuf(nullptr)[m
+ {[m
+     m_poSrcDS = nullptr;[m
+     m_nPercentComplete = -1;[m
+[36m@@ -176,6 +182,7 @@[m [mGDALECWCompressor::~GDALECWCompressor()[m
+ #else[m
+     NCSFreeFileInfoEx(&sFileInfo);[m
+ #endif[m
+[32m+[m[32m    CPLFree(m_pabySwathBuf);[m
+ }[m
+ [m
+ /************************************************************************/[m
+[36m@@ -201,7 +208,6 @@[m [mCNCSError GDALECWCompressor::WriteReadLine( UINT32 nNextLine,[m
+ {[m
+     int    iBand, *panBandMap;[m
+     CPLErr eErr;[m
+[31m-    int nWordSize = GDALGetDataTypeSize( eWorkDT ) / 8;[m
+ [m
+ #ifdef DEBUG_VERBOSE[m
+     CPLDebug("ECW", "nNextLine = %d", nNextLine);[m
+[36m@@ -211,24 +217,69 @@[m [mCNCSError GDALECWCompressor::WriteReadLine( UINT32 nNextLine,[m
+     for( iBand = 0; iBand < sFileInfo.nBands; iBand++ )[m
+         panBandMap[iBand] = iBand+1;[m
+ [m
+[31m-    GByte *pabyLineBuf =[m
+[31m-        (GByte *) CPLMalloc( sFileInfo.nSizeX * sFileInfo.nBands[m
+[31m-                             * nWordSize );[m
+[32m+[m[32m    if( m_poSrcDS == nullptr || m_poSrcDS->GetRasterBand(1) == nullptr )[m
+[32m+[m[32m    {[m
+[32m+[m[32m        return GetCNCSError(NCS_FILEIO_ERROR);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if( m_nSwathLines <= 0 )[m
+[32m+[m[32m    {[m
+[32m+[m[32m        int nBlockX;[m
+[32m+[m[32m        constexpr int MIN_SWATH_LINES = 256;[m
+[32m+[m[32m        m_poSrcDS->GetRasterBand(1)->GetBlockSize( &nBlockX, &m_nSwathLines );[m
+[32m+[m[32m        if(m_nSwathLines < MIN_SWATH_LINES)[m
+[32m+[m[32m            m_nSwathLines = MIN_SWATH_LINES;[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    GSpacing nPixelSpace = GDALGetDataTypeSize( eWorkDT ) / 8;[m
+[32m+[m[32m    GSpacing nLineSpace = sFileInfo.nSizeX * nPixelSpace;[m
+[32m+[m[32m    GSpacing nBandSpace = nLineSpace * m_nSwathLines;[m
+[32m+[m
+[32m+[m[32m    if( m_pabySwathBuf == nullptr )[m
+[32m+[m[32m    {[m
+[32m+[m[32m        size_t nBufSize = static_cast<size_t>(nBandSpace * sFileInfo.nBands);[m
+[32m+[m[32m        m_pabySwathBuf = (GByte *) VSI_MALLOC_VERBOSE(nBufSize);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if( m_pabySwathBuf == nullptr )[m
+[32m+[m[32m    {[m
+[32m+[m[32m        return GetCNCSError(NCS_FILE_NO_MEMORY);[m
+[32m+[m[32m    }[m
+ [m
+[31m-    eErr = m_poSrcDS->RasterIO( GF_Read, 0, nNextLine, sFileInfo.nSizeX, 1,[m
+[31m-                                pabyLineBuf, sFileInfo.nSizeX, 1,[m
+[31m-                                eWorkDT,[m
+[31m-                                sFileInfo.nBands, panBandMap,[m
+[31m-                                nWordSize, 0, nWordSize * sFileInfo.nSizeX, nullptr );[m
+[32m+[m[32m    if(nNextLine == 0 || nNextLine >= m_nSwathOffset + m_nSwathLines)[m
+[32m+[m[32m    {[m
+[32m+[m[32m        int nSwathLines = m_nSwathLines;[m
+[32m+[m[32m        if(nNextLine + nSwathLines > sFileInfo.nSizeY)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            nSwathLines = sFileInfo.nSizeY - nNextLine;[m
+[32m+[m[32m        }[m
+[32m+[m[32m        eErr = m_poSrcDS->RasterIO( GF_Read, 0, nNextLine, sFileInfo.nSizeX, nSwathLines,[m
+[32m+[m[32m                                    m_pabySwathBuf, sFileInfo.nSizeX, nSwathLines,[m
+[32m+[m[32m                                    eWorkDT, sFileInfo.nBands, panBandMap,[m
+[32m+[m[32m                                    nPixelSpace, nLineSpace, nBandSpace, nullptr );[m
+[32m+[m[32m        m_nSwathOffset = nNextLine;[m
+[32m+[m[32m        UINT32 nNextSwathLine = nNextLine + nSwathLines;[m
+[32m+[m[32m        if(nNextSwathLine < sFileInfo.nSizeY)[m
+[32m+[m[32m        {[m
+[32m+[m[32m            if(nNextSwathLine + nSwathLines > sFileInfo.nSizeY)[m
+[32m+[m[32m            {[m
+[32m+[m[32m                nSwathLines = sFileInfo.nSizeY - nNextSwathLine;[m
+[32m+[m[32m            }[m
+[32m+[m[32m            m_poSrcDS->AdviseRead( 0, nNextSwathLine, sFileInfo.nSizeX, nSwathLines,[m
+[32m+[m[32m                                   sFileInfo.nSizeX, nSwathLines, eWorkDT,[m
+[32m+[m[32m                                   sFileInfo.nBands, panBandMap, nullptr );[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m[32m    else[m
+[32m+[m[32m    {[m
+[32m+[m[32m        eErr = CE_None;[m
+[32m+[m[32m    }[m
+ [m
+     for( iBand = 0; iBand < (int) sFileInfo.nBands; iBand++ )[m
+     {[m
+         memcpy( ppInputArray[iBand],[m
+[31m-                pabyLineBuf + nWordSize * sFileInfo.nSizeX * iBand,[m
+[31m-                nWordSize * sFileInfo.nSizeX );[m
+[32m+[m[32m                m_pabySwathBuf + nLineSpace * (nNextLine - m_nSwathOffset) + nBandSpace * iBand,[m
+[32m+[m[32m                static_cast<size_t>(nPixelSpace * sFileInfo.nSizeX) );[m
+     }[m
+ [m
+[31m-    CPLFree( pabyLineBuf );[m
+     CPLFree( panBandMap );[m
+ [m
+     if( eErr == CE_None )[m
