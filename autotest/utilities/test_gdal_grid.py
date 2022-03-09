@@ -511,7 +511,7 @@ def test_gdal_grid_5():
     ds_ref = gdal.Open('ref_data/grid_minimum.tif')
     assert ds.GetRasterBand(1).Checksum() == ds_ref.GetRasterBand(1).Checksum(), \
         ('bad checksum : got %d, expected %d' %
-              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).checksum_ref))
+              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).Checksum()))
     ds_ref = None
     ds = None
 
@@ -531,7 +531,7 @@ def test_gdal_grid_5():
     ds_ref = gdal.Open('ref_data/grid_minimum_400_100_120.tif')
     assert ds.GetRasterBand(1).Checksum() == ds_ref.GetRasterBand(1).Checksum(), \
         ('bad checksum : got %d, expected %d' %
-              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).checksum_ref))
+              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).Checksum()))
     ds_ref = None
     ds = None
 
@@ -559,7 +559,7 @@ def test_gdal_grid_6():
     ds_ref = gdal.Open('ref_data/grid_maximum.tif')
     assert ds.GetRasterBand(1).Checksum() == ds_ref.GetRasterBand(1).Checksum(), \
         ('bad checksum : got %d, expected %d' %
-              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).checksum_ref))
+              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).Checksum()))
     ds_ref = None
     ds = None
 
@@ -579,7 +579,7 @@ def test_gdal_grid_6():
     ds_ref = gdal.Open('ref_data/grid_maximum_100_100.tif')
     assert ds.GetRasterBand(1).Checksum() == ds_ref.GetRasterBand(1).Checksum(), \
         ('bad checksum : got %d, expected %d' %
-              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).checksum_ref))
+              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).Checksum()))
     ds_ref = None
     ds = None
 
@@ -607,7 +607,7 @@ def test_gdal_grid_7():
     ds_ref = gdal.Open('ref_data/grid_range.tif')
     assert ds.GetRasterBand(1).Checksum() == ds_ref.GetRasterBand(1).Checksum(), \
         ('bad checksum : got %d, expected %d' %
-              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).checksum_ref))
+              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).Checksum()))
     ds_ref = None
     ds = None
 
@@ -655,7 +655,7 @@ def test_gdal_grid_8():
     ds_ref = gdal.Open('ref_data/grid_count_70_70.tif')
     assert ds.GetRasterBand(1).Checksum() == ds_ref.GetRasterBand(1).Checksum(), \
         ('bad checksum : got %d, expected %d' %
-              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).checksum_ref))
+              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).Checksum()))
     ds_ref = None
     ds = None
 
@@ -674,7 +674,7 @@ def test_gdal_grid_8():
     ds_ref = gdal.Open('ref_data/grid_count_300_300.tif')
     assert ds.GetRasterBand(1).Checksum() == ds_ref.GetRasterBand(1).Checksum(), \
         ('bad checksum : got %d, expected %d' %
-              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).checksum_ref))
+              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).Checksum()))
     ds_ref = None
     ds = None
 
@@ -702,7 +702,7 @@ def test_gdal_grid_9():
     ds = gdal.Open(outfiles[-1])
     ds_ref = gdal.Open('ref_data/grid_avdist.tif')
     maxdiff = gdaltest.compare_ds(ds, ds_ref, verbose=0)
-    ds_ref = None
+    #ds_ref = None
     if maxdiff > 1:
         gdaltest.compare_ds(ds, ds_ref, verbose=1)
         pytest.fail('Image too different from the reference')
@@ -910,7 +910,7 @@ def test_gdal_grid_tr():
     ds_ref = gdal.Open('ref_data/grid_count_70_70.tif')
     assert ds.GetRasterBand(1).Checksum() == ds_ref.GetRasterBand(1).Checksum(), \
         ('bad checksum : got %d, expected %d' %
-              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).checksum_ref))
+              (ds.GetRasterBand(1).Checksum(), ds_ref.GetRasterBand(1).Checksum()))
     ds_ref = None
     ds = None
 
